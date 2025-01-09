@@ -14,3 +14,7 @@ source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/fo
 ```bash
 source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/docker.sh)
 ```
+- Solana installation command
+```bash
+source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/solana.sh)
+```
