@@ -1,6 +1,6 @@
 - Node js and npm installation command
 ```bash
-source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/node.sh)
+curl -sSL https://raw.githubusercontent.com/zunxbt/installation/main/node.sh | bash
 ```
 - Rust installation command
 ```bash
