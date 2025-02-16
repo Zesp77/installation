@@ -18,3 +18,7 @@ source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/do
 ```bash
 source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/solana.sh)
 ```
+- Git installation command
+```bash
+curl -sSL https://raw.githubusercontent.com/zunxbt/installation/main/git.sh | bash
+```
