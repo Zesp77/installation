@@ -4,7 +4,7 @@ source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/no
 ```
 - Rust installation command
 ```bash
-source <(wget -O - https://raw.githubusercontent.com/zunxbt/installation/main/rust.sh)
+curl -sSL https://raw.githubusercontent.com/zunxbt/installation/main/rust.sh | bash
 ```
 - Foundry installation command
 ```bash
