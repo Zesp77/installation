@@ -6,10 +6,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 error() {
     echo -e "${RED}[ERROR]${NC} $1"
+    exit 1
 }
 
 warn() {
@@ -51,9 +52,7 @@ run_with_spinner() {
     wait "$pid"
     local exit_status=$?
 
-    # Clear the line
     printf "\r\033[K"
-
     return $exit_status
 }
 
@@ -67,7 +66,7 @@ load_rust_env() {
     export PATH="${CARGO_HOME}/bin:${PATH}"
     
     if [ -f "${CARGO_HOME}/env" ]; then
-        source "${CARGO_HOME}/env" > /dev/null 2>&1
+        source "${CARGO_HOME}/env" >/dev/null 2>&1
         success "Rust environment loaded"
     else
         warn "Rust environment file not found at ${CARGO_HOME}/env"
@@ -78,151 +77,74 @@ install_dependencies() {
     info "Checking system dependencies..."
     
     if command -v apt &>/dev/null; then
-        if ! run_with_spinner "Updating package lists" sudo apt update; then
-            error "Failed to update package lists"
-            exit 1
-        fi
-        
-        if run_with_spinner "Installing build tools" sudo apt install -y build-essential libssl-dev curl; then
-            success "Build tools installed"
-        else
-            error "Failed to install build tools"
-            exit 1
-        fi
-        
+        run_with_spinner "Updating package lists" sudo apt update -y
+        run_with_spinner "Installing build tools" sudo apt install -y build-essential libssl-dev curl
     elif command -v yum &>/dev/null; then
-        if ! run_with_spinner "Installing development tools" sudo yum groupinstall -y 'Development Tools'; then
-            error "Failed to install development tools"
-            exit 1
-        fi
-        
-        if ! run_with_spinner "Installing system libraries" sudo yum install -y openssl-devel curl; then
-            error "Failed to install system libraries"
-            exit 1
-        fi
-        
+        run_with_spinner "Installing development tools" sudo yum groupinstall -y 'Development Tools'
+        run_with_spinner "Installing system libraries" sudo yum install -y openssl-devel curl
     elif command -v dnf &>/dev/null; then
-        if ! run_with_spinner "Installing development tools" sudo dnf groupinstall -y 'Development Tools'; then
-            error "Failed to install development tools"
-            exit 1
-        fi
-        
-        if ! run_with_spinner "Installing system libraries" sudo dnf install -y openssl-devel curl; then
-            error "Failed to install system libraries"
-            exit 1
-        fi
-        
+        run_with_spinner "Installing development tools" sudo dnf groupinstall -y 'Development Tools'
+        run_with_spinner "Installing system libraries" sudo dnf install -y openssl-devel curl
     elif command -v pacman &>/dev/null; then
-        if ! run_with_spinner "Updating system packages" sudo pacman -Syu --noconfirm; then
-            error "Failed to update system packages"
-            exit 1
-        fi
-        
-        if ! run_with_spinner "Installing base development tools" sudo pacman -S --noconfirm base-devel openssl curl; then
-            error "Failed to install base development tools"
-            exit 1
-        fi
+        run_with_spinner "Updating system packages" sudo pacman -Syu --noconfirm
+        run_with_spinner "Installing base development tools" sudo pacman -S --noconfirm base-devel openssl curl
     else
         error "Unsupported package manager. Install dependencies manually."
-        exit 1
     fi
 }
 
 install_rust() {
     if command -v rustup &>/dev/null; then
-        warn "Rust is already installed."
-        read -rp "Reinstall/update Rust? (y/N): " choice
-        if [[ "${choice,,}" == "y" ]]; then
-            if run_with_spinner "Uninstalling existing Rust" rustup self uninstall -y; then
-                success "Existing Rust installation removed"
-            else
-                error "Failed to uninstall existing Rust"
-                exit 1
-            fi
-        else
-            info "Skipping Rust reinstallation."
-            return 0
-        fi
+        info "Existing Rust installation detected. Forcing reinstall."
+        run_with_spinner "Uninstalling existing Rust" rustup self uninstall -y
     fi
 
-    info "Starting Rust installation (this may take a few minutes)..."
+    info "Starting Rust installation..."
     if run_with_spinner "Installing Rust" bash -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"; then
         success "Rust installed successfully"
     else
         error "Rust installation failed!"
-        exit 1
     fi
 }
 
 fix_permissions() {
-    info "Verifying directory permissions..."
-    for dir in "${RUSTUP_HOME}" "${CARGO_HOME}"; do
-        if [ -d "${dir}" ]; then
-            if [ "$(stat -c %a "${dir}")" -ne 755 ]; then
-                if run_with_spinner "Setting permissions for ${dir}" chmod -R 755 "${dir}"; then
-                    success "Permissions set for ${dir}"
-                else
-                    error "Failed to set permissions for ${dir}"
-                    exit 1
-                fi
-            fi
-        else
-            warn "Directory not found: ${dir}"
-        fi
-    done
+    [ -d "${RUSTUP_HOME}" ] && chmod -R 755 "${RUSTUP_HOME}"
+    [ -d "${CARGO_HOME}" ] && chmod -R 755 "${CARGO_HOME}"
 }
 
 update_shell_profile() {
     local shell_profile
     case "$SHELL" in
-        */bash)
-            shell_profile="${HOME}/.bashrc"
-            ;;
-        */zsh)
-            shell_profile="${HOME}/.zshrc"
-            ;;
-        *)
-            shell_profile="${HOME}/.profile"
-            ;;
+        */bash) shell_profile="${HOME}/.bashrc";;
+        */zsh) shell_profile="${HOME}/.zshrc";;
+        *) shell_profile="${HOME}/.profile";;
     esac
 
     local env_line="source \"${CARGO_HOME}/env\""
-
-    if [ -f "$shell_profile" ] && ! grep -qF "$env_line" "$shell_profile"; then
-        if run_with_spinner "Updating shell profile" bash -c "echo -e '\n# Added by Rust setup script\n${env_line}' >> '$shell_profile'"; then
-            success "Shell profile updated. New shells will have Rust environment configured."
-        else
-            warn "Failed to update shell profile. Add 'source ${CARGO_HOME}/env' manually."
-        fi
-    else
-        info "Rust environment setup already present in $shell_profile"
+    if ! grep -qF "$env_line" "$shell_profile"; then
+        echo -e "\n# Added by Rust setup script\n${env_line}" >> "$shell_profile"
     fi
 }
 
 verify_installation() {
-    info "Verifying installation..."
-    if command -v rustc &>/dev/null && command -v cargo &>/dev/null; then
-        rust_version=$(rustc --version 2>/dev/null)
-        cargo_version=$(cargo --version 2>/dev/null)
-        success "Rust components verified"
-        echo -e "${CYAN}${rust_version}${NC}"
-        echo -e "${CYAN}${cargo_version}${NC}"
-    else
-        error "Rust components not found!"
-        exit 1
-    fi
+    command -v rustc >/dev/null && command -v cargo >/dev/null
 }
 
 main() {
-    info "Starting Rust installation process..."
+    info "Starting automated Rust setup..."
     install_dependencies
     install_rust
     load_rust_env
     fix_permissions
-    verify_installation
     update_shell_profile
     
-    success "Rust setup completed successfully!"
+    if verify_installation; then
+        success "Rust setup completed successfully!"
+        echo -e "• Rust version: ${CYAN}$(rustc --version)${NC}"
+        echo -e "• Cargo version: ${CYAN}$(cargo --version)${NC}"
+    else
+        error "Rust installation verification failed!"
+    fi
 }
 
 main
