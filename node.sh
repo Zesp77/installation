@@ -49,7 +49,7 @@ MAJOR_VERSION=$(echo $LATEST_VERSION | cut -d. -f1)
 
 # Set up the NodeSource repository for the latest major version
 show "Setting up NodeSource repository for Node.js $MAJOR_VERSION.x..." "progress"
-curl -sL https://deb.nodesource.com/setup_${MAJOR_VERSION}.x | sudo -E bash -
+curl -sL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 if [ $? -ne 0 ]; then
     show "Failed to set up NodeSource repository." "error"
     exit 1
